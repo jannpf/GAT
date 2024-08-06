@@ -1,0 +1,9 @@
+matplotlib
+plotly
+pandas
+numpy
+networkx
+leidenalg
+python-igraph
+python-louvain
+scipy
