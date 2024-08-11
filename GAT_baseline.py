@@ -1,5 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
+import pandas as pd
+import argparse
 import numpy as np
 import networkx.algorithms.community as nx_comm
 import networkx as nx
@@ -13,18 +15,36 @@ from torch_geometric.nn import GATConv, GCNConv
 from torch_geometric.utils import from_scipy_sparse_matrix
 
 
-# DATASET = 'karate'
-DATASET = 'univ'
-# DATASET = 'enron'
-# DATASET = 'deezer'
 HIDDEN_CHANNELS = 64
 OUT_CHANNELS = 32  # Size of the embedding
-NUM_HEADS = 16
+NUM_HEADS = 8
 LR = 0.01
 P_DROPOUT = 0.6
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 100
 MAX_NUM_CLUSTERS = 12
 DATA_PATH = "./data/"
+
+
+def load_data(dataset):
+    # Load the dataset
+    if dataset == "karate":
+        G = nx.karate_club_graph()
+    elif dataset == "enron":
+        # Load the Matrix Market file
+        matrix = mmread(DATA_PATH + "email_enron_only.mtx")
+        G = nx.from_scipy_sparse_array(matrix)
+    elif dataset == "univ":
+        # Convert the sparse matrix to a NetworkX graph
+        G = nx.read_edgelist(DATA_PATH + "email_univ.edges")
+        G = nx.from_numpy_array(nx.adjacency_matrix(G).todense())
+    elif dataset == "deezer":
+        G = pd.read_csv(DATA_PATH + "deezer_clean_data/" + "HR_edges.csv")
+        G = nx.from_pandas_edgelist(G, source="node_1", target="node_2")
+    else:
+        raise Exception("No valid dataset specified")
+    edge_index = torch.tensor(list(G.edges), dtype=torch.long).t().contiguous()
+    adj_matrix = nx.adjacency_matrix(G).todense()
+    return G, edge_index, adj_matrix
 
 
 class GAT(torch.nn.Module):
@@ -42,86 +62,36 @@ class GAT(torch.nn.Module):
         return x
 
 
-def custom_loss(output):
-    variance_term = -torch.var(output)
-    centroid = torch.mean(output, dim=0)
-    distance_to_centroid = torch.mean(torch.norm(output - centroid, dim=1))
+def contrastive_loss(output, G, margin=1.0):
+    positive_pairs = []
+    negative_pairs = []
 
-    lambda_reg = 1
-    spatial = variance_term - lambda_reg * distance_to_centroid
+    # Create positive pairs (connected nodes)
+    for edge in G.edges():
+        u, v = edge
+        positive_pairs.append((u, v))
 
-    return spatial
+    # Create negative pairs (unconnected nodes)
+    nodes = list(G.nodes())
+    for u in nodes:
+        for v in nodes:
+            if u != v and not G.has_edge(u, v):
+                negative_pairs.append((u, v))
 
+    # Compute the loss
+    loss = 0.0
+    for u, v in positive_pairs:
+        dist = torch.norm(output[u] - output[v])
+        loss += dist**2
 
-# Define the training loop
-def train():
-    model.train()
-    optimizer.zero_grad()
-    out = model(data)
-    # Since the task is unsupervised, we'll minimize the variance of node embeddings
-    loss = custom_loss(out)
-    loss.backward()
-    optimizer.step()
-    return loss.item()
+    for u, v in negative_pairs:
+        dist = torch.norm(output[u] - output[v])
+        loss += torch.clamp(margin - dist, min=0.0)**2
 
-
-def plot_communities(G, node_community_labels, title="Communities"):
-    plt.figure(figsize=(15, 7))
-    pos = nx.spring_layout(G, seed=42)
-
-    nx.draw(G, pos, node_color=node_community_labels, with_labels=True, cmap=plt.cm.Set3)
-    plt.title(title)
-
-    plt.show()
+    return loss / (len(positive_pairs) + len(negative_pairs))
 
 
-if __name__ == "__main__":
-
-    # Load the dataset
-    if DATASET == 'enron':
-        # Load the Matrix Market file
-        matrix = mmread(DATA_PATH + "email_enron_only.mtx")
-        G = from_scipy_sparse_matrix(matrix)
-        edge_index = G[0]
-        adj_matrix = nx.adjacency_matrix(G).todense()
-    elif DATASET == 'univ':
-        # Convert the sparse matrix to a NetworkX graph
-        G = nx.read_edgelist(DATA_PATH + "email_univ.edges")
-        G = nx.from_numpy_array(nx.adjacency_matrix(G).todense())
-        edge_index = torch.tensor(list(G.edges), dtype=torch.long).t().contiguous()
-        adj_matrix = nx.adjacency_matrix(G).todense()
-    else:
-        raise Exception("No valid dataset specified")
-
-    # Create a PyTorch Geometric data object
-    data = Data(edge_index=edge_index)
-    data.num_nodes = G.number_of_nodes()
-    # data.num_nodes = matrix.shape[0]
-
-    # Print some basic info
-    print(f'Number of nodes: {data.num_nodes}')
-    print(f'Number of edges: {data.edge_index.size(1)}')
-
-    # Initialize the GAT model
-    num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
-    model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS)
-
-    # Initialize features as identity matrix (one-hot encoding of nodes)
-    data.x = torch.eye(data.num_nodes)
-
-    # Define the optimizer
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
-
-    # Training process
-    for epoch in range(NUM_EPOCHS):
-        loss = train()
-        if epoch % 100 == 0:
-            print(f'Epoch {epoch}, Loss: {loss:.4f}')
-
-    # Get the node embeddings
-    model.eval()
-    node_embeddings = model(data).detach().numpy()
-
+def get_kmeans_pred(node_embeddings):
     # Use k-means clustering
     best_score = -1
     best_k = 2
@@ -134,6 +104,89 @@ if __name__ == "__main__":
 
     kmeans = KMeans(n_clusters=best_k, random_state=0).fit(node_embeddings)
     labels = kmeans.labels_
+    return best_k, labels
+
+
+def plot_communities(G, node_community_labels, title="Communities"):
+    plt.figure(figsize=(15, 7))
+    pos = nx.spring_layout(G, seed=42)
+
+    nx.draw(
+        G, pos, node_color=node_community_labels, with_labels=True, cmap=plt.cm.Set3
+    )
+    plt.title(title)
+
+    plt.show()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Select a dataset")
+    parser.add_argument(
+        "-d",
+        type=str,
+        choices=["karate", "univ", "enron", "deezer"],
+        required=True,
+        help="Specify the dataset: karate, univ, enron, or deezer",
+    )
+    parser.add_argument(
+        "-l",
+        type=str,
+        choices=["variance", "contrastive"],
+        required=False,
+        default="variance",
+        help="Specify the loss func: variance or contrastive",
+    )
+    args = parser.parse_args()
+    DATASET = args.d
+    LOSS = args.l
+
+    # load data
+    G, edge_index, adj_matrix = load_data(DATASET)
+
+    # Create a PyTorch Geometric data object
+    data = Data(edge_index=edge_index)
+    data.num_nodes = G.number_of_nodes()
+
+    # Print some basic info
+    print(f"Number of nodes: {data.num_nodes}")
+    print(f"Number of edges: {data.edge_index.size(1)}")
+
+    # Initialize the GAT model
+    num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
+    model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS)
+
+    # Initialize features as identity matrix (one-hot encoding of nodes)
+    data.x = torch.eye(data.num_nodes)
+
+    # Define the optimizer
+    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
+
+    # Define the training loop
+    def train():
+        model.train()
+        optimizer.zero_grad()
+        out = model(data)
+        if LOSS == "variance":
+            # Since the task is unsupervised, we'll minimize the variance of node embeddings
+            loss = -torch.var(out)
+        else:
+            loss = contrastive_loss(out, G)
+        loss.backward()
+        optimizer.step()
+        return loss.item()
+
+    # Training process
+    for epoch in range(NUM_EPOCHS):
+        loss = train()
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch}, Loss: {loss:.4f}")
+
+    # Get the node embeddings
+    model.eval()
+    node_embeddings = model(data).detach().numpy()
+
+    # get kmeans predictions
+    best_k, labels = get_kmeans_pred(node_embeddings)
 
     # Convert labels to communities
     communities = [[] for _ in range(best_k)]
@@ -141,6 +194,6 @@ if __name__ == "__main__":
         communities[label].append(node)
 
     modularity = nx_comm.modularity(G, communities)
-    print(f'Best number of communities: {best_k}, Modularity: {modularity}')
+    print(f"Best number of communities: {best_k}, Modularity: {modularity}")
 
     plot_communities(G, labels)
