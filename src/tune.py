@@ -1,7 +1,7 @@
 import optuna
 import torch
 
-from DGIModel import DGIModel
+from . import DGIModel
 
 
 def tune(data):
@@ -19,7 +19,7 @@ def tune(data):
         weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-3, log=True)
 
         # Initialize the model with the sampled hyperparameters
-        model = DGIModel(in_channels=data.num_features, hidden_channels=hidden_channels, out_channels=out_channels, num_layers=num_layers, heads=heads, dropout=dropout)
+        model = DGIModel.DGIModel(in_channels=data.num_features, hidden_channels=hidden_channels, out_channels=out_channels, num_layers=num_layers, heads=heads, dropout=dropout)
         model = model.to(device)
         
         # Define the optimizer
