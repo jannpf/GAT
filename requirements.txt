@@ -1,9 +1,14 @@
+torch
 matplotlib
-plotly
-pandas
 numpy
 networkx
+scikit-learn
+scipy
+torch-geometric
 leidenalg
 python-igraph
+dgl
+plotly
+pandas
 python-louvain
-scipy
+optuna
