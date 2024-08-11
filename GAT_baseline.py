@@ -1,26 +1,25 @@
-import torch
-import matplotlib.pyplot as plt
-import pandas as pd
 import argparse
-import numpy as np
-import networkx.algorithms.community as nx_comm
+
+import matplotlib.pyplot as plt
 import networkx as nx
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
+import networkx.algorithms.community as nx_comm
+import pandas as pd
+import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from scipy.io import mmread
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 from torch_geometric.data import Data
-from torch_geometric.nn import GATConv, GCNConv
-from torch_geometric.utils import from_scipy_sparse_matrix
+from torch_geometric.nn import GATConv
 
 
 HIDDEN_CHANNELS = 64
 OUT_CHANNELS = 32  # Size of the embedding
 NUM_HEADS = 8
-LR = 0.01
+LR = 0.001
 P_DROPOUT = 0.6
-NUM_EPOCHS = 100
+NUM_EPOCHS = 500
 MAX_NUM_CLUSTERS = 12
 DATA_PATH = "./data/"
 
