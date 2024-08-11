@@ -3,6 +3,7 @@ import argparse
 import matplotlib.pyplot as plt
 import networkx as nx
 import networkx.algorithms.community as nx_comm
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
@@ -19,9 +20,10 @@ OUT_CHANNELS = 32  # Size of the embedding
 NUM_HEADS = 8
 LR = 0.001
 P_DROPOUT = 0.6
-NUM_EPOCHS = 500
+NUM_EPOCHS = 100
 MAX_NUM_CLUSTERS = 12
 DATA_PATH = "./data/"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def load_data(dataset):
@@ -61,33 +63,72 @@ class GAT(torch.nn.Module):
         return x
 
 
+# def contrastive_loss(output, G, margin=1.0):
+#     positive_pairs = []
+#     negative_pairs = []
+#
+#     # Create positive pairs (connected nodes)
+#     for edge in G.edges():
+#         u, v = edge
+#         positive_pairs.append((u, v))
+#
+#     # Create negative pairs (unconnected nodes)
+#     nodes = list(G.nodes())
+#     for u in nodes:
+#         for v in nodes:
+#             if u != v and not G.has_edge(u, v):
+#                 negative_pairs.append((u, v))
+#
+#     # Compute the loss
+#     loss = 0.0
+#     for u, v in positive_pairs:
+#         dist = torch.norm(output[u] - output[v])
+#         loss += dist**2
+#
+#     for u, v in negative_pairs:
+#         dist = torch.norm(output[u] - output[v])
+#         loss += torch.clamp(margin - dist, min=0.0)**2
+#
+#     return loss / (len(positive_pairs) + len(negative_pairs))
+
+
 def contrastive_loss(output, G, margin=1.0):
-    positive_pairs = []
+    positive_pairs = np.array(list(G.edges()))
+    num_nodes = G.number_of_nodes()
+
+    # Random sampling of negative pairs
     negative_pairs = []
-
-    # Create positive pairs (connected nodes)
-    for edge in G.edges():
-        u, v = edge
-        positive_pairs.append((u, v))
-
-    # Create negative pairs (unconnected nodes)
     nodes = list(G.nodes())
-    for u in nodes:
-        for v in nodes:
-            if u != v and not G.has_edge(u, v):
-                negative_pairs.append((u, v))
+    num_iterations = num_nodes ** 2
+    negative_sampling_rate = 1e4 / num_iterations  # num_neg_samples should be <= 1e4
+    num_negative_samples = min(int(negative_sampling_rate * num_iterations), num_iterations)
+    print(num_negative_samples)
 
-    # Compute the loss
-    loss = 0.0
-    for u, v in positive_pairs:
-        dist = torch.norm(output[u] - output[v])
-        loss += dist**2
+    while len(negative_pairs) < num_negative_samples:
+        u = np.random.choice(nodes)
+        v = np.random.choice(nodes)
+        if u != v and not G.has_edge(u, v):
+            negative_pairs.append((u, v))
 
-    for u, v in negative_pairs:
-        dist = torch.norm(output[u] - output[v])
-        loss += torch.clamp(margin - dist, min=0.0)**2
+    negative_pairs = np.array(negative_pairs)
 
-    return loss / (len(positive_pairs) + len(negative_pairs))
+    # Compute positive loss
+    positive_u = output[positive_pairs[:, 0]]
+    positive_v = output[positive_pairs[:, 1]]
+    positive_distances = torch.norm(positive_u - positive_v, dim=1)
+    positive_loss = torch.sum(positive_distances**2)
+
+    # Compute negative loss
+    negative_u = output[negative_pairs[:, 0]]
+    negative_v = output[negative_pairs[:, 1]]
+    negative_distances = torch.norm(negative_u - negative_v, dim=1)
+    negative_loss = torch.sum(torch.clamp(margin - negative_distances, min=0.0)**2)
+
+    # Combine losses
+    total_loss = positive_loss + negative_loss
+    total_pairs = len(positive_pairs) + len(negative_pairs)
+
+    return total_loss / total_pairs
 
 
 def get_kmeans_pred(node_embeddings):
@@ -143,19 +184,20 @@ if __name__ == "__main__":
     G, edge_index, adj_matrix = load_data(DATASET)
 
     # Create a PyTorch Geometric data object
-    data = Data(edge_index=edge_index)
+    data = Data(edge_index=edge_index).to(DEVICE)
     data.num_nodes = G.number_of_nodes()
 
     # Print some basic info
     print(f"Number of nodes: {data.num_nodes}")
     print(f"Number of edges: {data.edge_index.size(1)}")
+    print(f"Training model on {DEVICE}")
 
     # Initialize the GAT model
     num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
-    model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS)
+    model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS).to(DEVICE)
 
     # Initialize features as identity matrix (one-hot encoding of nodes)
-    data.x = torch.eye(data.num_nodes)
+    data.x = torch.eye(data.num_nodes).to(DEVICE)
 
     # Define the optimizer
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
@@ -166,7 +208,7 @@ if __name__ == "__main__":
         optimizer.zero_grad()
         out = model(data)
         if LOSS == "variance":
-            # Since the task is unsupervised, we'll minimize the variance of node embeddings
+            # Since the task is unsupervised, we'll maximize the variance of node embeddings
             loss = -torch.var(out)
         else:
             loss = contrastive_loss(out, G)
