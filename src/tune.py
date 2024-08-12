@@ -145,8 +145,8 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
         NUM_EPOCHS = 100
         for epoch in range(NUM_EPOCHS):
             loss = train()
-            if epoch % 10 == 0:
-                print(f"Epoch {epoch}, Loss: {loss:.4f}")
+            # if epoch % 10 == 0:
+            #     print(f"Epoch {epoch}, Loss: {loss:.4f}")
 
         # get embeddings
         model.eval()
@@ -173,7 +173,6 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
     study = optuna.create_study(direction='maximize')
     study.optimize(objective, n_trials=50)
 
-    # return study
     return study
 
     # return {

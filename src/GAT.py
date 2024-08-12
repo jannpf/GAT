@@ -13,7 +13,6 @@ class GAT(torch.nn.Module):
     def __init__(self, num_features, hidden_channels, out_channels, num_heads, dropout):
         super(GAT, self).__init__()
         self.dropout = dropout
-        print(dropout)
         self.conv1 = GATConv(num_features, hidden_channels, heads=num_heads)
         self.conv2 = GATConv(hidden_channels * num_heads, out_channels, heads=1)
 
