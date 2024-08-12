@@ -92,13 +92,13 @@ def tune(data, accumulation_steps=1):
 
     return study
 
-    return {
-        'best_params': study.best_params,
-        'best_value': study.best_value,
-        'n_clusters': study.best_trial.user_attrs['n_clusters'],
-        'final_loss': study.best_trial.user_attrs['final_loss'],
-        'best_method': study.best_trial.user_attrs['best_method']
-    }
+    # return {
+    #     'best_params': study.best_params,
+    #     'best_value': study.best_value,
+    #     'n_clusters': study.best_trial.user_attrs['n_clusters'],
+    #     'final_loss': study.best_trial.user_attrs['final_loss'],
+    #     'best_method': study.best_trial.user_attrs['best_method']
+    # }
 
 
 def tune_variance_contrastive(data, G, loss_function = "variance"):

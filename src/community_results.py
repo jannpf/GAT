@@ -40,9 +40,17 @@ def community_metrics(graph, labels):
     avg_community_size = sum(len(community)
                              for community in community_list) / num_communities
 
+    # Average cluster coefficients
+    avg_cluster_coeff = nx.average_clustering(graph)
+
+    # Number of connected components
+    conn_comp = len(list(nx.connected_components(graph)))
+
     return {
         "Number of Communities": num_communities,
         "Average Community Size": avg_community_size,
+        "Average Cluster Coefficients": avg_cluster_coeff,
+        "Number of connected components": conn_comp,
         "Modularity": mod,
         "Coverage": coverage,
         "Performance": performance,
