@@ -8,7 +8,7 @@ from . import GAT_baseline
 from torch_geometric.data import Data
 
 
-def tune(data, G):
+def tune(data, G, loss_function = "variance"):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     data.to(device)
     n_features = data.num_features
@@ -40,8 +40,10 @@ def tune(data, G):
             model.train()
             optimizer.zero_grad()
             out = model(data)
-            # loss = -torch.var(out)
-            loss = GAT.contrastive_loss(out, G)
+            if loss_function == "variance":
+                loss = -torch.var(out)
+            else:
+                loss = GAT.contrastive_loss(out, G)
             loss.backward()
             optimizer.step()
             return loss.item()
@@ -106,5 +108,5 @@ if __name__ == "__main__":
     data.num_nodes = G.number_of_nodes()
     num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
     data.x = torch.eye(data.num_nodes)
-    best_p = tune(data, G)
+    best_p = tune(data, G, loss="contrastive")
     print(best_p)
