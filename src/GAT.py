@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from dgl.nn.pytorch import GATConv
+from torch_geometric.nn import GATConv
 
 
 class GATLayer(nn.Module):
@@ -47,3 +47,23 @@ class GATLayer(nn.Module):
         # equation (3) & (4)
         self.g.update_all(self.message_func, self.reduce_func)
         return self.g.ndata.pop("h")
+
+
+class GAT(torch.nn.Module):
+    """
+    A higher level implementation of the whole GAT model.
+    """
+
+    def __init__(self, num_features, hidden_channels, out_channels, num_heads, dropout):
+        super(GAT, self).__init__()
+        self.dropout = dropout
+        self.conv1 = GATConv(num_features, hidden_channels, heads=num_heads)
+        self.conv2 = GATConv(hidden_channels * num_heads, out_channels, heads=1)
+
+    def forward(self, data):
+        x, edge_index = data.x, data.edge_index
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = F.elu(self.conv1(x, edge_index))
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.conv2(x, edge_index)
+        return x

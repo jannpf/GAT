@@ -1,18 +1,17 @@
 import argparse
 
-import matplotlib.pyplot as plt
 import networkx as nx
-import networkx.algorithms.community as nx_comm
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
 from scipy.io import mmread
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from torch_geometric.data import Data
-from torch_geometric.nn import GATConv
+
+from src.community_results import community_metrics, plot_communities
+from src.GAT import GAT
 
 
 HIDDEN_CHANNELS = 64
@@ -20,7 +19,7 @@ OUT_CHANNELS = 32  # Size of the embedding
 NUM_HEADS = 8
 LR = 0.001
 P_DROPOUT = 0.6
-NUM_EPOCHS = 100
+NUM_EPOCHS = 300
 MAX_NUM_CLUSTERS = 12
 DATA_PATH = "./data/"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -48,50 +47,6 @@ def load_data(dataset):
     return G, edge_index, adj_matrix
 
 
-class GAT(torch.nn.Module):
-    def __init__(self, num_features, hidden_channels, out_channels, num_heads):
-        super(GAT, self).__init__()
-        self.conv1 = GATConv(num_features, hidden_channels, heads=num_heads)
-        self.conv2 = GATConv(hidden_channels * num_heads, out_channels, heads=1)
-
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
-        x = F.dropout(x, p=P_DROPOUT, training=self.training)
-        x = F.elu(self.conv1(x, edge_index))
-        x = F.dropout(x, p=P_DROPOUT, training=self.training)
-        x = self.conv2(x, edge_index)
-        return x
-
-
-# def contrastive_loss(output, G, margin=1.0):
-#     positive_pairs = []
-#     negative_pairs = []
-#
-#     # Create positive pairs (connected nodes)
-#     for edge in G.edges():
-#         u, v = edge
-#         positive_pairs.append((u, v))
-#
-#     # Create negative pairs (unconnected nodes)
-#     nodes = list(G.nodes())
-#     for u in nodes:
-#         for v in nodes:
-#             if u != v and not G.has_edge(u, v):
-#                 negative_pairs.append((u, v))
-#
-#     # Compute the loss
-#     loss = 0.0
-#     for u, v in positive_pairs:
-#         dist = torch.norm(output[u] - output[v])
-#         loss += dist**2
-#
-#     for u, v in negative_pairs:
-#         dist = torch.norm(output[u] - output[v])
-#         loss += torch.clamp(margin - dist, min=0.0)**2
-#
-#     return loss / (len(positive_pairs) + len(negative_pairs))
-
-
 def contrastive_loss(output, G, margin=1.0):
     positive_pairs = np.array(list(G.edges()))
     num_nodes = G.number_of_nodes()
@@ -102,7 +57,6 @@ def contrastive_loss(output, G, margin=1.0):
     num_iterations = num_nodes ** 2
     negative_sampling_rate = 1e4 / num_iterations  # num_neg_samples should be <= 1e4
     num_negative_samples = min(int(negative_sampling_rate * num_iterations), num_iterations)
-    print(num_negative_samples)
 
     while len(negative_pairs) < num_negative_samples:
         u = np.random.choice(nodes)
@@ -147,18 +101,6 @@ def get_kmeans_pred(node_embeddings):
     return best_k, labels
 
 
-def plot_communities(G, node_community_labels, title="Communities"):
-    plt.figure(figsize=(15, 7))
-    pos = nx.spring_layout(G, seed=42)
-
-    nx.draw(
-        G, pos, node_color=node_community_labels, with_labels=True, cmap=plt.cm.Set3
-    )
-    plt.title(title)
-
-    plt.show()
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Select a dataset")
     parser.add_argument(
@@ -194,7 +136,7 @@ if __name__ == "__main__":
 
     # Initialize the GAT model
     num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
-    model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS).to(DEVICE)
+    model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS, P_DROPOUT).to(DEVICE)
 
     # Initialize features as identity matrix (one-hot encoding of nodes)
     data.x = torch.eye(data.num_nodes).to(DEVICE)
@@ -208,7 +150,6 @@ if __name__ == "__main__":
         optimizer.zero_grad()
         out = model(data)
         if LOSS == "variance":
-            # Since the task is unsupervised, we'll maximize the variance of node embeddings
             loss = -torch.var(out)
         else:
             loss = contrastive_loss(out, G)
@@ -229,12 +170,7 @@ if __name__ == "__main__":
     # get kmeans predictions
     best_k, labels = get_kmeans_pred(node_embeddings)
 
-    # Convert labels to communities
-    communities = [[] for _ in range(best_k)]
-    for node, label in enumerate(labels):
-        communities[label].append(node)
-
-    modularity = nx_comm.modularity(G, communities)
-    print(f"Best number of communities: {best_k}, Modularity: {modularity}")
-
+    # Calculations and visualizations
+    metrics = community_metrics(G, list(labels))
+    print(metrics)
     plot_communities(G, labels)
