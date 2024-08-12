@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 
@@ -49,9 +50,9 @@ def community_metrics(graph, labels):
     return {
         "Number of Communities": num_communities,
         "Average Community Size": avg_community_size,
+        "Modularity": mod,
         "Average Cluster Coefficients": avg_cluster_coeff,
         "Number of connected components": conn_comp,
-        "Modularity": mod,
         "Coverage": coverage,
         "Performance": performance,
     }
@@ -67,4 +68,10 @@ def plot_communities(G, node_community_labels, title="Communities"):
             with_labels=True, cmap=plt.cm.Set3)
     plt.title(title)
 
+    plt.show()
+
+
+def community_size_hist(communities, title="Community size distribution"):
+    communities = pd.DataFrame.from_dict(communities, orient="index", columns=["community"])
+    communities.value_counts("community").sort_index().plot(kind="bar", figsize=(6, 3), title=title, rot=0)
     plt.show()

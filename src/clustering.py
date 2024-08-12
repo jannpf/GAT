@@ -45,8 +45,8 @@ def kmeans(g, node_embeddings, max_num_clusters=12):
     for k in range(2, max_num_clusters):
         kmeans = KMeans(n_clusters=k, random_state=0).fit(node_embeddings)
         labels = list(kmeans.labels_)
-        labels = {node: label for node, label in enumerate(labels)}
-        score = community_results.community_metrics(g, labels)["Modularity"]
+        communities = {node: label for node, label in enumerate(labels)}
+        score = community_results.community_metrics(g, communities)["Modularity"]
         # alternatively
         # score = silhouette_score(node_embeddings, kmeans.labels_)
         if score > best_score:
@@ -55,8 +55,8 @@ def kmeans(g, node_embeddings, max_num_clusters=12):
 
     kmeans = KMeans(n_clusters=best_k, random_state=0).fit(node_embeddings)
     labels = list(kmeans.labels_)
-    labels = {node: label for node, label in enumerate(labels)}
-    return best_score, best_k, labels
+    communities = {node: label for node, label in enumerate(labels)}
+    return best_score, best_k, communities
 
 
 def optics(g, node_embeddings):
@@ -66,7 +66,8 @@ def optics(g, node_embeddings):
     """
     optics = OPTICS(min_samples=5)
     clusters = optics.fit_predict(node_embeddings)
-    labels = dict(zip(range(g.number_of_nodes()), clusters))
+    clusters = clusters + 1  # default starts with -1
+    communities = dict(zip(range(g.number_of_nodes()), clusters))
     best_k = len(set(clusters))
-    modularity = community_results.community_metrics(g, labels)['Modularity']
-    return modularity, best_k, labels
+    modularity = community_results.community_metrics(g, communities)['Modularity']
+    return modularity, best_k, communities
