@@ -73,15 +73,19 @@ def plot_communities(G, node_community_labels, title="Communities", plot_labels=
     plt.title(title)
 
     if metrics is not None:
+        metrics = {
+            key: round(value, 4) if isinstance(value, float) else value
+            for key, value in metrics.items()
+        }
         text = "\n".join([f"{key}: {value}" for key, value in metrics.items()])
         fig.text(0.1, 0.1, text, fontsize=12, ha='left', va='bottom', bbox=dict(facecolor='white', alpha=0.5))
 
     plt.show()
 
-    return fig
-
 
 def community_size_hist(communities, title="Community size distribution"):
     communities = pd.DataFrame.from_dict(communities, orient="index", columns=["community"])
     communities.value_counts("community").sort_index().plot(kind="bar", figsize=(6, 3), title=title, rot=0)
+    for pos in ['right', 'top']:
+        plt.gca().spines[pos].set_visible(False)
     plt.show()
