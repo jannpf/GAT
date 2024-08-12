@@ -58,8 +58,8 @@ def community_metrics(graph, labels):
     }
 
 
-def plot_communities(G, node_community_labels, title="Communities", plot_labels=True):
-    plt.figure(figsize=(15, 7))
+def plot_communities(G, node_community_labels, title="Communities", plot_labels=True, metrics=None):
+    fig = plt.figure(figsize=(15, 7))
     pos = nx.spring_layout(G, seed=42)
 
     if not isinstance(node_community_labels, np.ndarray):
@@ -72,7 +72,13 @@ def plot_communities(G, node_community_labels, title="Communities", plot_labels=
                 with_labels=True, cmap=plt.cm.Set3)
     plt.title(title)
 
+    if metrics is not None:
+        text = "\n".join([f"{key}: {value}" for key, value in metrics.items()])
+        fig.text(0.1, 0.1, text, fontsize=12, ha='left', va='bottom', bbox=dict(facecolor='white', alpha=0.5))
+
     plt.show()
+
+    return fig
 
 
 def community_size_hist(communities, title="Community size distribution"):
