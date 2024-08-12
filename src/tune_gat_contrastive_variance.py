@@ -1,10 +1,11 @@
 import optuna
 import torch
 
-from sklearn.cluster import KMeans, OPTICS
-
-from src.GAT import GAT
-from . import community_results
+from . import GAT
+from . import clustering
+import argparse
+from . import GAT_baseline
+from torch_geometric.data import Data
 
 
 def tune(data, G):
@@ -22,7 +23,7 @@ def tune(data, G):
         weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-3, log=True)
 
         # Initialize the model with the sampled hyperparameters
-        model = GAT(
+        model = GAT.GAT(
             num_features=n_features,
             hidden_channels=hidden_channels,
             out_channels=out_channels,
@@ -59,27 +60,18 @@ def tune(data, G):
             embeddings = model(data).detach().numpy()
 
         # apply kmeans and optics, determine modularity
-        best_m = -1
-        best_n = 0
+        best_m, best_n, _ = clustering.kmeans(G, embeddings)
+        best_method = "kmeans"
 
-        # kmeans
-        for n in range(2, 12):
-            kmeans = KMeans(n_clusters=n)
-            clusters = kmeans.fit_predict(embeddings)
-            modularity = community_results.community_metrics(G, dict(zip(range(G.number_of_nodes()), clusters)))['Modularity']
-            if modularity > best_m:
-                best_n, best_m = n, modularity
-
-        # optics
-        optics = OPTICS(min_samples=5)
-        clusters = optics.fit_predict(embeddings)
-        modularity = community_results.community_metrics(G, dict(zip(range(G.number_of_nodes()), clusters)))['Modularity']
-        if modularity > best_m:
-            best_n, best_m = 'OPTICS', modularity
-
+        optics_m, optics_n, _ = clustering.optics(G, embeddings)
+        if optics_m > best_m:
+            best_m = optics_m
+            best_n = optics_n
+            best_method = "optics"
 
         trial.set_user_attr('final_loss', loss)
         trial.set_user_attr('n_clusters', best_n)
+        trial.set_user_attr('best_method', best_method)
 
         # return the final modularity as the objective to maximize
         return best_m
@@ -93,14 +85,12 @@ def tune(data, G):
         'best_params': study.best_params,
         'best_value': study.best_value,
         'n_clusters': study.best_trial.user_attrs['n_clusters'],
-        'final_loss': study.best_trial.user_attrs['final_loss']
+        'final_loss': study.best_trial.user_attrs['final_loss'],
+        'best_method': study.best_trial.user_attrs['best_method']
     }
 
 
 if __name__ == "__main__":
-    import argparse
-    from src.GAT_baseline import load_data
-    from torch_geometric.data import Data
     parser = argparse.ArgumentParser(description="Select a dataset")
     parser.add_argument(
         "-d",
@@ -112,7 +102,7 @@ if __name__ == "__main__":
     # load data
     args = parser.parse_args()
     DATASET = args.d
-    G, edge_index, adj_matrix = load_data(DATASET)
+    G, edge_index, adj_matrix = GAT_baseline.load_data(DATASET)
     data = Data(edge_index=edge_index)
     data.num_nodes = G.number_of_nodes()
     num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features

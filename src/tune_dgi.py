@@ -3,10 +3,9 @@ import torch
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import to_networkx
 
-from sklearn.cluster import KMeans, OPTICS
 
 from . import DGIModel
-from . import community_results
+from . import clustering
 
 def tune(data, accumulation_steps=1):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -70,26 +69,17 @@ def tune(data, accumulation_steps=1):
             embeddings = model.encoder(data.x, data.edge_index).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
-        best_m = -1
-        best_n = 0
+        best_m, best_n, _ = clustering.kmeans(G_nx, embeddings)
+        best_method = "kmeans"
 
-        # kmeans
-        for n in range(2, 11):
-            kmeans = KMeans(n_clusters=n)
-            clusters = kmeans.fit_predict(embeddings)
-            modularity = community_results.community_metrics(G_nx, dict(zip(range(G_nx.number_of_nodes()), clusters)))['Modularity']
-            if modularity > best_m:
-                best_n, best_m = n, modularity
-
-        # optics
-        optics = OPTICS(min_samples=5)
-        clusters = optics.fit_predict(embeddings)
-        modularity = community_results.community_metrics(G_nx, dict(zip(range(G_nx.number_of_nodes()), clusters)))['Modularity']
-        if modularity > best_m:
-            best_n, best_m = 'OPTICS', modularity
-
+        optics_m, optics_n, _ = clustering.optics(G_nx, embeddings)
+        if optics_m > best_m:
+            best_m = optics_m
+            best_n = optics_n
+            best_method = "optics"
 
         trial.set_user_attr('final_loss', loss.item())
+        trial.set_user_attr('best_method', best_n)
         trial.set_user_attr('n_clusters', best_n)
 
         # return the final modularity as the objective to maximize
@@ -104,5 +94,6 @@ def tune(data, accumulation_steps=1):
         'best_params': study.best_params,
         'best_value': study.best_value,
         'n_clusters': study.best_trial.user_attrs['n_clusters'],
-        'final_loss': study.best_trial.user_attrs['final_loss']
+        'final_loss': study.best_trial.user_attrs['final_loss'],
+        'best_method': study.best_trial.user_attrs['best_method']
     }

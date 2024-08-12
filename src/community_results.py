@@ -17,8 +17,6 @@ def community_metrics(graph, labels):
         - "Number of Communities": The number of detected communities.
         - "Average Community Size": The average size of the communities.
     """
-    if isinstance(labels, list):
-        labels = {node: label for node, label in enumerate(labels)}
 
     # Group nodes by community
     communities = {}

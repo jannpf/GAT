@@ -6,11 +6,10 @@ import pandas as pd
 import torch
 import torch.optim as optim
 from scipy.io import mmread
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
 from torch_geometric.data import Data
 
 from .community_results import community_metrics, plot_communities
+from .clustering import kmeans, optics
 from .GAT import GAT
 
 
@@ -85,20 +84,6 @@ def contrastive_loss(output, G, margin=1.0):
     return total_loss / total_pairs
 
 
-def get_kmeans_pred(node_embeddings):
-    # Use k-means clustering
-    best_score = -1
-    best_k = 2
-    for k in range(2, MAX_NUM_CLUSTERS):
-        kmeans = KMeans(n_clusters=k, random_state=0).fit(node_embeddings)
-        score = silhouette_score(node_embeddings, kmeans.labels_)
-        if score > best_score:
-            best_score = score
-            best_k = k
-
-    kmeans = KMeans(n_clusters=best_k, random_state=0).fit(node_embeddings)
-    labels = kmeans.labels_
-    return best_k, labels
 
 
 if __name__ == "__main__":
@@ -167,9 +152,9 @@ if __name__ == "__main__":
     node_embeddings = model(data).detach().numpy()
 
     # get kmeans predictions
-    best_k, labels = get_kmeans_pred(node_embeddings)
+    _, best_k, labels = optics(G, node_embeddings)
 
     # Calculations and visualizations
-    metrics = community_metrics(G, list(labels))
+    metrics = community_metrics(G, labels)
     print(metrics)
     plot_communities(G, labels)
