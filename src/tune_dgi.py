@@ -25,7 +25,7 @@ def tune(data, accumulation_steps=1):
         dropout = trial.suggest_float('dropout', 0.1, 0.8, log=True)
         weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-3, log=True)
 
-        # # deezer        
+        # # deezer
         # hidden_channels = trial.suggest_int('hidden_channels', 16, 128)
         # out_channels = trial.suggest_int('out_channels', 16, 64)
         # num_layers = trial.suggest_int('num_layers', 2, 4)

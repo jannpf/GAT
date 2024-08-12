@@ -10,8 +10,8 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from torch_geometric.data import Data
 
-from src.community_results import community_metrics, plot_communities
-from src.GAT import GAT
+from .community_results import community_metrics, plot_communities
+from .GAT import GAT
 
 
 HIDDEN_CHANNELS = 64
@@ -128,6 +128,9 @@ if __name__ == "__main__":
     # Create a PyTorch Geometric data object
     data = Data(edge_index=edge_index).to(DEVICE)
     data.num_nodes = G.number_of_nodes()
+    # Initialize features as identity matrix (one-hot encoding of nodes)
+    data.x = torch.eye(data.num_nodes).to(DEVICE)
+    num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
 
     # Print some basic info
     print(f"Number of nodes: {data.num_nodes}")
@@ -135,11 +138,7 @@ if __name__ == "__main__":
     print(f"Training model on {DEVICE}")
 
     # Initialize the GAT model
-    num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
     model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS, P_DROPOUT).to(DEVICE)
-
-    # Initialize features as identity matrix (one-hot encoding of nodes)
-    data.x = torch.eye(data.num_nodes).to(DEVICE)
 
     # Define the optimizer
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
