@@ -81,7 +81,7 @@ def tune(data, accumulation_steps=1):
             best_method = "optics"
 
         trial.set_user_attr('final_loss', loss.item())
-        trial.set_user_attr('best_method', best_n)
+        trial.set_user_attr('best_method', best_method)
         trial.set_user_attr('n_clusters', best_n)
 
         # return the final modularity as the objective to maximize
@@ -174,14 +174,15 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
     study.optimize(objective, n_trials=50)
 
     # return study
+    return study
 
-    return {
-        'best_params': study.best_params,
-        'best_value': study.best_value,
-        'n_clusters': study.best_trial.user_attrs['n_clusters'],
-        'final_loss': study.best_trial.user_attrs['final_loss'],
-        'best_method': study.best_trial.user_attrs['best_method']
-    }
+    # return {
+    #     'best_params': study.best_params,
+    #     'best_value': study.best_value,
+    #     'n_clusters': study.best_trial.user_attrs['n_clusters'],
+    #     'final_loss': study.best_trial.user_attrs['final_loss'],
+    #     'best_method': study.best_trial.user_attrs['best_method']
+    # }
 
 
 if __name__ == "__main__":
@@ -201,5 +202,5 @@ if __name__ == "__main__":
     data.num_nodes = G.number_of_nodes()
     num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
     data.x = torch.eye(data.num_nodes)
-    best_p = tune_variance_contrastive(data, G, loss_function="contrastive")
-    print(best_p)
+    study = tune_variance_contrastive(data, G, loss_function="contrastive")
+    print(study.best_value)
