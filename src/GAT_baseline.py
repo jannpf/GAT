@@ -1,7 +1,6 @@
 import argparse
 
 import networkx as nx
-import numpy as np
 import pandas as pd
 import torch
 import torch.optim as optim
@@ -10,7 +9,7 @@ from torch_geometric.data import Data
 
 from .community_results import community_metrics, plot_communities
 from .clustering import kmeans, optics
-from .GAT import GAT
+from . import GAT
 
 
 HIDDEN_CHANNELS = 64
@@ -44,46 +43,6 @@ def load_data(dataset):
     edge_index = torch.tensor(list(G.edges), dtype=torch.long).t().contiguous()
     adj_matrix = nx.adjacency_matrix(G).todense()
     return G, edge_index, adj_matrix
-
-
-def contrastive_loss(output, G, margin=1.0):
-    positive_pairs = np.array(list(G.edges()))
-    num_nodes = G.number_of_nodes()
-
-    # Random sampling of negative pairs
-    negative_pairs = []
-    nodes = list(G.nodes())
-    num_iterations = num_nodes ** 2
-    negative_sampling_rate = 1e4 / num_iterations  # num_neg_samples should be <= 1e4
-    num_negative_samples = min(int(negative_sampling_rate * num_iterations), num_iterations)
-
-    while len(negative_pairs) < num_negative_samples:
-        u = np.random.choice(nodes)
-        v = np.random.choice(nodes)
-        if u != v and not G.has_edge(u, v):
-            negative_pairs.append((u, v))
-
-    negative_pairs = np.array(negative_pairs)
-
-    # Compute positive loss
-    positive_u = output[positive_pairs[:, 0]]
-    positive_v = output[positive_pairs[:, 1]]
-    positive_distances = torch.norm(positive_u - positive_v, dim=1)
-    positive_loss = torch.sum(positive_distances**2)
-
-    # Compute negative loss
-    negative_u = output[negative_pairs[:, 0]]
-    negative_v = output[negative_pairs[:, 1]]
-    negative_distances = torch.norm(negative_u - negative_v, dim=1)
-    negative_loss = torch.sum(torch.clamp(margin - negative_distances, min=0.0)**2)
-
-    # Combine losses
-    total_loss = positive_loss + negative_loss
-    total_pairs = len(positive_pairs) + len(negative_pairs)
-
-    return total_loss / total_pairs
-
-
 
 
 if __name__ == "__main__":
@@ -123,7 +82,7 @@ if __name__ == "__main__":
     print(f"Training model on {DEVICE}")
 
     # Initialize the GAT model
-    model = GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS, P_DROPOUT).to(DEVICE)
+    model = GAT.GAT(num_features, HIDDEN_CHANNELS, OUT_CHANNELS, NUM_HEADS, P_DROPOUT).to(DEVICE)
 
     # Define the optimizer
     optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
@@ -136,7 +95,7 @@ if __name__ == "__main__":
         if LOSS == "variance":
             loss = -torch.var(out)
         else:
-            loss = contrastive_loss(out, G)
+            loss = GAT.contrastive_loss(out, G)
         loss.backward()
         optimizer.step()
         return loss.item()

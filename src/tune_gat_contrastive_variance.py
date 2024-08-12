@@ -37,12 +37,11 @@ def tune(data, G):
 
         # Define the training loop
         def train():
-            from src.GAT_baseline import contrastive_loss
             model.train()
             optimizer.zero_grad()
             out = model(data)
             # loss = -torch.var(out)
-            loss = contrastive_loss(out, G)
+            loss = GAT.contrastive_loss(out, G)
             loss.backward()
             optimizer.step()
             return loss.item()
