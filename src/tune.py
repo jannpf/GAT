@@ -71,15 +71,19 @@ def tune(data, accumulation_steps=1):
             embeddings = model.encoder(data.x, data.edge_index).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
-        best_m, best_n, _ = clustering.kmeans(G_nx, embeddings)
+        scores, best_n, _ = clustering.kmeans(G_nx, embeddings)
+        best_m = scores['Modularity']
         best_method = "kmeans"
 
-        optics_m, optics_n, _ = clustering.optics(G_nx, embeddings)
+        scores_optics, optics_n, _ = clustering.optics(G_nx, embeddings)
+        optics_m = scores_optics['Modularity']
         if optics_m > best_m:
+            scores = scores_optics
             best_m = optics_m
             best_n = optics_n
             best_method = "optics"
 
+        trial.set_user_attr('scores', scores)
         trial.set_user_attr('final_loss', loss.item())
         trial.set_user_attr('best_method', best_method)
         trial.set_user_attr('n_clusters', best_n)
@@ -154,15 +158,19 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
             embeddings = model(data).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
-        best_m, best_n, _ = clustering.kmeans(G, embeddings)
+        scores, best_n, _ = clustering.kmeans(G, embeddings)
+        best_m = scores['Modularity']
         best_method = "kmeans"
 
-        optics_m, optics_n, _ = clustering.optics(G, embeddings)
+        scores_optics, optics_n, _ = clustering.optics(G, embeddings)
+        optics_m = scores_optics['Modularity']
         if optics_m > best_m:
+            scores = scores_optics
             best_m = optics_m
             best_n = optics_n
             best_method = "optics"
 
+        trial.set_user_attr('scores', scores)
         trial.set_user_attr('final_loss', loss)
         trial.set_user_attr('n_clusters', best_n)
         trial.set_user_attr('best_method', best_method)

@@ -114,7 +114,8 @@ def kmeans(g, node_embeddings, max_num_clusters=12):
     kmeans = KMeans(n_clusters=best_k, random_state=0).fit(node_embeddings)
     labels = list(kmeans.labels_)
     communities = {node: label for node, label in enumerate(labels)}
-    return best_score, best_k, communities
+    scores = community_results.community_metrics(g, communities)
+    return scores, best_k, communities
 
 
 def optics(g, node_embeddings):
@@ -127,5 +128,5 @@ def optics(g, node_embeddings):
     clusters = clusters + 1  # default starts with -1
     communities = dict(zip(range(g.number_of_nodes()), clusters))
     best_k = len(set(clusters))
-    modularity = community_results.community_metrics(g, communities)['Modularity']
-    return modularity, best_k, communities
+    scores = community_results.community_metrics(g, communities)
+    return scores, best_k, communities
