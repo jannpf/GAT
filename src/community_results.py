@@ -58,18 +58,23 @@ def community_metrics(graph, labels):
     }
 
 
-def plot_communities(G, node_community_labels, title="Communities", plot_labels=True, metrics=None):
+def plot_communities(G, node_community_labels, title="Communities", details=True, metrics=None):
+    if not details:
+        args = {
+            'width': 0.5,
+            'node_size': 50}
+        k = 0.1
+    else:
+        args = {}
+        k = None
+
     fig = plt.figure(figsize=(15, 7))
-    pos = nx.spring_layout(G, seed=42)
+    pos = nx.spring_layout(G, seed=42, k=k)
 
     if not isinstance(node_community_labels, np.ndarray):
         node_community_labels = list(node_community_labels.values())
-    if not plot_labels:
-        nx.draw(G, pos, node_color=node_community_labels,
-                with_labels=plot_labels, cmap=plt.cm.Set3, node_size=70)
-    else:
-        nx.draw(G, pos, node_color=node_community_labels,
-                with_labels=True, cmap=plt.cm.Set3)
+    
+    nx.draw(G, pos, node_color=node_community_labels, with_labels=details, cmap=plt.cm.Set3, **args)
     plt.title(title)
 
     if metrics is not None:

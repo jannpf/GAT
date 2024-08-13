@@ -151,7 +151,7 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
         # get embeddings
         model.eval()
         with torch.no_grad():
-            embeddings = model(data).detach().numpy()
+            embeddings = model(data).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
         best_m, best_n, _ = clustering.kmeans(G, embeddings)
