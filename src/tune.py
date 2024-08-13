@@ -92,7 +92,8 @@ def tune(data, accumulation_steps=1):
         return best_m
 
     study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=50)
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    study.optimize(objective, n_trials=50, show_progress_bar=True)
 
     return study
 

@@ -88,9 +88,9 @@ def plot_communities(G, node_community_labels, title="Communities", details=True
     plt.show()
 
 
-def community_size_hist(communities, title="Community size distribution"):
+def community_size_hist(communities, title="Community size distribution", wide=False):
     communities = pd.DataFrame.from_dict(communities, orient="index", columns=["community"])
-    communities.value_counts("community").sort_index().plot(kind="bar", figsize=(6, 3), title=title, rot=0)
+    communities.value_counts("community").sort_index().plot(kind="bar", figsize=(12 if wide else 6, 3), title=title, rot=0)
     for pos in ['right', 'top']:
         plt.gca().spines[pos].set_visible(False)
     plt.show()

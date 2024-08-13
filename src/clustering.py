@@ -92,7 +92,7 @@ def leiden(g: nx.Graph, n_iterations: int = -1, seed=None, resolution=None):
     return {node: part for node, part in zip(g.nodes(), leiden_partition.membership)}
 
 
-def kmeans(g, node_embeddings, max_num_clusters=12):
+def kmeans(g, node_embeddings, max_num_clusters=14):
     """
     Use k-means clustering on node embeddings
     for range [2, max_num_clusters].
