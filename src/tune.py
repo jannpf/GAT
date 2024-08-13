@@ -1,4 +1,5 @@
 import argparse
+import time
 
 import optuna
 import torch
@@ -17,6 +18,8 @@ def tune(data, accumulation_steps=1):
     data_loader = DataLoader([data], batch_size=1, shuffle=True)
 
     def objective(trial):
+        start_time = time.time()
+
         # Hyperparameter ranges
         hidden_channels = trial.suggest_int('hidden_channels', 8, 64)
         out_channels = trial.suggest_int('out_channels', 4, 32)
@@ -71,22 +74,28 @@ def tune(data, accumulation_steps=1):
             embeddings = model.encoder(data.x, data.edge_index).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
-        scores, best_n, _ = clustering.kmeans(G_nx, embeddings)
-        best_m = scores['Modularity']
+        metrics, best_n, communities = clustering.kmeans(G_nx, embeddings)
+        best_m = metrics['Modularity']
         best_method = "kmeans"
 
-        scores_optics, optics_n, _ = clustering.optics(G_nx, embeddings)
-        optics_m = scores_optics['Modularity']
+        metrics_optics, optics_n, c_opt = clustering.optics(G_nx, embeddings)
+        optics_m = metrics_optics['Modularity']
         if optics_m > best_m:
-            scores = scores_optics
+            metrics = metrics_optics
             best_m = optics_m
             best_n = optics_n
             best_method = "optics"
+            communities = c_opt
 
-        trial.set_user_attr('scores', scores)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        trial.set_user_attr('elapsed_time', elapsed_time)
+        trial.set_user_attr('metrics', metrics)
         trial.set_user_attr('final_loss', loss.item())
         trial.set_user_attr('best_method', best_method)
         trial.set_user_attr('n_clusters', best_n)
+        trial.set_user_attr('communities', communities)
 
         # return the final modularity as the objective to maximize
         return best_m
@@ -112,6 +121,8 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
     n_features = data.num_features
 
     def objective(trial):
+        start_time = time.time()
+
         # Hyperparameter ranges
         hidden_channels = trial.suggest_int('hidden_channels', 8, 64)
         out_channels = trial.suggest_int('out_channels', 4, 32)
@@ -159,22 +170,28 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
             embeddings = model(data).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
-        scores, best_n, _ = clustering.kmeans(G, embeddings)
-        best_m = scores['Modularity']
+        metrics, best_n, communities = clustering.kmeans(G, embeddings)
+        best_m = metrics['Modularity']
         best_method = "kmeans"
 
-        scores_optics, optics_n, _ = clustering.optics(G, embeddings)
-        optics_m = scores_optics['Modularity']
+        metrics_optics, optics_n, c_opt = clustering.optics(G, embeddings)
+        optics_m = metrics_optics['Modularity']
         if optics_m > best_m:
-            scores = scores_optics
+            metrics = metrics_optics
             best_m = optics_m
             best_n = optics_n
             best_method = "optics"
+            communities = c_opt
 
-        trial.set_user_attr('scores', scores)
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        trial.set_user_attr('elapsed_time', elapsed_time)
+        trial.set_user_attr('metrics', metrics)
         trial.set_user_attr('final_loss', loss)
         trial.set_user_attr('n_clusters', best_n)
         trial.set_user_attr('best_method', best_method)
+        trial.set_user_attr('communities', communities)
 
         # return the final modularity as the objective to maximize
         return best_m
