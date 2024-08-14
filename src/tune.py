@@ -197,7 +197,7 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
         return best_m
 
     study = optuna.create_study(direction='maximize')
-    study.optimize(objective, n_trials=50)
+    study.optimize(objective, n_trials=50, show_progress_bar=True)
 
     return study
 
