@@ -7,7 +7,7 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.utils import to_networkx
 
-from . import GAT, DGIModel, GAT_baseline, clustering
+from . import GAT, DGIModel, clustering
 
 
 def tune(data, accumulation_steps=1):
@@ -208,24 +208,3 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
     #     'final_loss': study.best_trial.user_attrs['final_loss'],
     #     'best_method': study.best_trial.user_attrs['best_method']
     # }
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Select a dataset")
-    parser.add_argument(
-        "-d",
-        type=str,
-        choices=["karate", "univ", "enron", "deezer"],
-        required=True,
-        help="Specify the dataset: karate, univ, enron, or deezer",
-    )
-    # load data
-    args = parser.parse_args()
-    DATASET = args.d
-    G, edge_index, adj_matrix = GAT_baseline.load_data(DATASET)
-    data = Data(edge_index=edge_index)
-    data.num_nodes = G.number_of_nodes()
-    num_features = data.num_nodes  # We'll use one-hot encodings of nodes as features
-    data.x = torch.eye(data.num_nodes)
-    study = tune_variance_contrastive(data, G, loss_function="contrastive")
-    print(study.best_value)
