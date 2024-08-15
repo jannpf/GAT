@@ -4,12 +4,12 @@ numpy
 networkx
 scikit-learn
 scipy
-torch-geometric
+torch_geometric
 leidenalg
-python-igraph
 dgl
 plotly
 pandas
 python-louvain
 optuna
 tqdm
+igraph
