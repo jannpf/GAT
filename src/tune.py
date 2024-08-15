@@ -10,7 +10,7 @@ from torch_geometric.utils import to_networkx
 from . import GAT, DGIModel, clustering
 
 
-def tune(data, accumulation_steps=1):
+def tune(data, accumulation_steps=1, max_num_clusters=14):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     data.to(device)
     G_nx = to_networkx(data, to_undirected=True)
@@ -74,7 +74,7 @@ def tune(data, accumulation_steps=1):
             embeddings = model.encoder(data.x, data.edge_index).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
-        metrics, best_n, communities = clustering.kmeans(G_nx, embeddings)
+        metrics, best_n, communities = clustering.kmeans(G_nx, embeddings, max_num_clusters=max_num_clusters)
         best_m = metrics['Modularity']
         best_method = "kmeans"
 
@@ -115,7 +115,7 @@ def tune(data, accumulation_steps=1):
     # }
 
 
-def tune_variance_contrastive(data, G, loss_function = "variance"):
+def tune_variance_contrastive(data, G, loss_function = "variance", max_num_clusters=14):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     data.to(device)
     n_features = data.num_features
@@ -170,7 +170,7 @@ def tune_variance_contrastive(data, G, loss_function = "variance"):
             embeddings = model(data).cpu().numpy()
 
         # apply kmeans and optics, determine modularity
-        metrics, best_n, communities = clustering.kmeans(G, embeddings)
+        metrics, best_n, communities = clustering.kmeans(G, embeddings, max_num_clusters=max_num_clusters)
         best_m = metrics['Modularity']
         best_method = "kmeans"
 
