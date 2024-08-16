@@ -5,7 +5,7 @@ Graph Appreciation Team
 Prerequisites: 
 * python3
 * pip
-* Any software that can run Jupyter Notebooks.  
+* Any software that can run Jupyter Notebooks
 
 To run notebooks locally, clone the repo (better run a shallow clone since the repo is quite big):
 
